@@ -28,8 +28,27 @@ export const proxy = async (req: NextRequest) => {
     return NextResponse.next();
   }
 
+  // Block adding tokens for bot requests / preview crawlers / non-navigations
+  const ua = req.headers.get("user-agent") || "";
+  const secFetchDest = req.headers.get("sec-fetch-dest");
+  const secFetchMode = req.headers.get("sec-fetch-mode");
+
+  const isLikelyBot =
+    /bot|crawler|spider|facebookexternalhit|discordbot|twitterbot|slackbot|whatsapp|telegram/i.test(
+      ua
+    );
+  const isNavigation =
+    secFetchDest === "document" ||
+    secFetchMode === "navigate" ||
+    req.method === "GET";
+
+  if (!isNavigation || isLikelyBot) {
+    // don't allocate a slot for non-user navigations or bots — just allow but don't set cookie
+    return NextResponse.next();
+  }
+
   // user is not allowed to join
-  if (meta.connected.length >= 3) {
+  if ((meta.connected || []).length >= 3) {
     return NextResponse.redirect(new URL("/?error=room_full", req.url));
   }
 

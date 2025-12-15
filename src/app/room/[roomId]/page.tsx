@@ -77,6 +77,40 @@ const Page = () => {
     return () => inputEl.removeEventListener("focus", handler);
   }, [inputRef.current]);
 
+  // Keep container padded to input height to avoid blank scroll area below input on mobile
+  useEffect(() => {
+    const setPadding = () => {
+      const inputH = inputRef.current?.getBoundingClientRect().height || 0;
+      if (containerRef.current) {
+        // add some extra spacing so messages don't butt right up against the input
+        containerRef.current.style.paddingBottom = `${inputH + 20}px`;
+      }
+    };
+
+    setPadding();
+
+    const resizeObs = () => setPadding();
+
+    window.addEventListener("resize", resizeObs);
+    window.addEventListener("orientationchange", resizeObs);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", resizeObs);
+    }
+
+    // also update when input's content changes (some keyboards change input height)
+    const inputEl = inputRef.current;
+    if (inputEl) inputEl.addEventListener("input", setPadding);
+
+    return () => {
+      window.removeEventListener("resize", resizeObs);
+      window.removeEventListener("orientationchange", resizeObs);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener("resize", resizeObs);
+      }
+      if (inputEl) inputEl.removeEventListener("input", setPadding);
+    };
+  }, [inputRef.current, containerRef.current]);
+
   const { data: ttlData } = useQuery({
     queryKey: ["room-ttl", roomId],
     queryFn: async () => {
@@ -99,7 +133,7 @@ const Page = () => {
       return;
     }
 
-    const interval = setInterval((prev) => {
+    const interval = setInterval(() => {
       setTimeRemaining((prev) => (prev !== null ? prev - 1 : null));
     }, 1000);
 
@@ -306,23 +340,31 @@ const Page = () => {
           // render authoritative server messages first
           messages?.messages.map((msg) => (
             <div key={msg.id} className="flex flex-col items-start">
-              <div className="max-w-[80%] group">
-                <div className="flex items-baseline gap-3 mb-1">
-                  <span
-                    className={`text-xs ${
-                      msg.sender === username
-                        ? "font-semibold text-teal-500"
-                        : "font-bold text-blue-400"
-                    }`}
-                  >
-                    {msg.sender === username ? "You" : msg.sender}
-                  </span>
+              <div
+                className={`max-w-[95%] sm:max-w-[80%] group ${
+                  msg.sender === username
+                    ? "border border-teal-500/20 bg-teal-500/5 pl-4 pr-4 py-2 rounded-md"
+                    : "border border-zinc-800 bg-zinc-900/40 pl-4 pr-4 py-2 rounded-md"
+                }`}
+              >
+                <div className="flex items-baseline gap-3 mb-1 justify-between">
+                  <div className="flex items-baseline gap-3">
+                    <span
+                      className={`text-xs ${
+                        msg.sender === username
+                          ? "font-semibold text-teal-500"
+                          : "font-medium text-amber-200"
+                      }`}
+                    >
+                      {msg.sender === username ? "You" : msg.sender}
+                    </span>
+                  </div>
 
                   <span className="text-[10px] text-zinc-600">
                     {format(new Date(msg.timestamp), "hh:mm a")}
                   </span>
                 </div>
-                <p className="text-sm text-zinc-300 leading-relaxed break-all">
+                <p className="text-sm text-zinc-200 leading-relaxed whitespace-pre-wrap wrap-break-word">
                   {msg.text}
                 </p>
               </div>
@@ -333,14 +375,18 @@ const Page = () => {
         {/* pending optimistic messages (render after server messages) - show on left for better UX */}
         {pendingMessages.map((msg) => (
           <div key={msg.id} className="flex flex-col items-start">
-            <div className="max-w-[80%] group">
-              <div className="flex items-baseline gap-3 mb-1">
-                <span className="text-xs font-semibold text-teal-500">You</span>
+            <div className="max-w-[95%] sm:max-w-[80%] group border border-teal-500/10 bg-teal-500/3 pl-4 pr-4 py-2 rounded-md">
+              <div className="flex items-baseline gap-3 mb-1 justify-between">
+                <div className="flex items-baseline gap-3">
+                  <span className="text-xs font-semibold text-teal-500">
+                    You
+                  </span>
+                </div>
                 <span className="text-[10px] text-zinc-600">
                   {format(new Date(msg.timestamp), "hh:mm a")}
                 </span>
               </div>
-              <p className="text-sm text-zinc-300 leading-relaxed break-all opacity-60 italic">
+              <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap wrap-break-word opacity-60 italic">
                 {msg.text}
               </p>
             </div>
