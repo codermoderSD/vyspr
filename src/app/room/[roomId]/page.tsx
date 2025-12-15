@@ -22,6 +22,53 @@ const Page = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [pendingMessages, setPendingMessages] = useState<any[]>([]);
 
+  // Keep a CSS variable for dynamic viewport height (fixes mobile keyboard resizing)
+  useEffect(() => {
+    const setVh = () => {
+      const h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+      document.documentElement.style.setProperty("--vh", `${h * 0.01}px`);
+
+      // when viewport changes (keyboard opens), scroll to bottom so input and latest messages are visible
+      requestAnimationFrame(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollTo({ top: containerRef.current.scrollHeight, behavior: "smooth" });
+        }
+      });
+    };
+
+    setVh();
+    window.addEventListener("resize", setVh);
+    window.addEventListener("orientationchange", setVh);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", setVh);
+    }
+
+    return () => {
+      window.removeEventListener("resize", setVh);
+      window.removeEventListener("orientationchange", setVh);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener("resize", setVh);
+      }
+    };
+  }, []);
+
+  // When input is focused (keyboard opens on some devices), ensure scroll-to-bottom
+  useEffect(() => {
+    const inputEl = inputRef.current;
+    if (!inputEl) return;
+
+    const handler = () => {
+      requestAnimationFrame(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollTo({ top: containerRef.current.scrollHeight, behavior: "smooth" });
+        }
+      });
+    };
+
+    inputEl.addEventListener("focus", handler);
+    return () => inputEl.removeEventListener("focus", handler);
+  }, [inputRef.current]);
+
   const { data: ttlData } = useQuery({
     queryKey: ["room-ttl", roomId],
     queryFn: async () => {
@@ -178,7 +225,10 @@ const Page = () => {
   };
 
   return (
-    <main className="flex flex-col h-screen max-h-screen overflow-hidden min-h-0">
+    <main
+      style={{ height: "calc(var(--vh, 1vh) * 100)" }}
+      className="flex flex-col overflow-hidden min-h-0"
+    >
       <header className="sticky top-0 z-20 border-b border-zinc-800 p-4 flex items-center justify-between bg-zinc-900/80 backdrop-blur-sm">
         <div className="flex items-center gap-4">
           <div className="flex flex-col">
@@ -272,17 +322,13 @@ const Page = () => {
           ))
         )}
 
-        {/* pending optimistic messages (render after server messages) */}
+        {/* pending optimistic messages (render after server messages) - show on left for better UX */}
         {pendingMessages.map((msg) => (
-          <div key={msg.id} className="flex flex-col items-end">
+          <div key={msg.id} className="flex flex-col items-start">
             <div className="max-w-[80%] group">
-              <div className="flex items-baseline gap-3 mb-1 justify-end">
-                <span className={`text-xs font-bold text-teal-500`}>
-                  {"You"}
-                </span>
-                <span className="text-[10px] text-zinc-600">
-                  {format(new Date(msg.timestamp), "hh:mm a")}
-                </span>
+              <div className="flex items-baseline gap-3 mb-1">
+                <span className="text-xs font-semibold text-teal-500">You</span>
+                <span className="text-[10px] text-zinc-600">{format(new Date(msg.timestamp), "hh:mm a")}</span>
               </div>
               <p className="text-sm text-zinc-300 leading-relaxed break-all opacity-60 italic">
                 {msg.text}
