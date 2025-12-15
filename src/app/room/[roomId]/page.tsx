@@ -25,13 +25,18 @@ const Page = () => {
   // Keep a CSS variable for dynamic viewport height (fixes mobile keyboard resizing)
   useEffect(() => {
     const setVh = () => {
-      const h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+      const h =
+        (window.visualViewport && window.visualViewport.height) ||
+        window.innerHeight;
       document.documentElement.style.setProperty("--vh", `${h * 0.01}px`);
 
       // when viewport changes (keyboard opens), scroll to bottom so input and latest messages are visible
       requestAnimationFrame(() => {
         if (containerRef.current) {
-          containerRef.current.scrollTo({ top: containerRef.current.scrollHeight, behavior: "smooth" });
+          containerRef.current.scrollTo({
+            top: containerRef.current.scrollHeight,
+            behavior: "smooth",
+          });
         }
       });
     };
@@ -60,7 +65,10 @@ const Page = () => {
     const handler = () => {
       requestAnimationFrame(() => {
         if (containerRef.current) {
-          containerRef.current.scrollTo({ top: containerRef.current.scrollHeight, behavior: "smooth" });
+          containerRef.current.scrollTo({
+            top: containerRef.current.scrollHeight,
+            behavior: "smooth",
+          });
         }
       });
     };
@@ -328,7 +336,9 @@ const Page = () => {
             <div className="max-w-[80%] group">
               <div className="flex items-baseline gap-3 mb-1">
                 <span className="text-xs font-semibold text-teal-500">You</span>
-                <span className="text-[10px] text-zinc-600">{format(new Date(msg.timestamp), "hh:mm a")}</span>
+                <span className="text-[10px] text-zinc-600">
+                  {format(new Date(msg.timestamp), "hh:mm a")}
+                </span>
               </div>
               <p className="text-sm text-zinc-300 leading-relaxed break-all opacity-60 italic">
                 {msg.text}
