@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Teal chevron logo: '>' -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="200" height="200" role="img" aria-label="> logo">
+  <title>VYSPR logo</title>
+  <g fill="none" stroke="#14B8A6" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M34 22 L70 50 L34 78" />
+  </g>
+</svg>
