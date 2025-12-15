@@ -111,7 +111,7 @@ const Page = () => {
           <div className="flex flex-col">
             <span className="text-xs text-zinc-500 uppercase">Room ID</span>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-green-500">{roomId}</span>
+              <span className="font-bold text-teal-500">{roomId}</span>
               <button
                 className="text-[10px] bg-zinc-800 hover:bg-zinc-700 px-2 py-0.5 rounded text-zinc-400 hover:text-zinc-200 transition-colors"
                 onClick={copyLink}
@@ -162,7 +162,7 @@ const Page = () => {
                   <span
                     className={`text-xs font-bold ${
                       msg.sender === username
-                        ? "text-green-500"
+                        ? "text-teal-500"
                         : "text-blue-400"
                     }`}
                   >
@@ -185,7 +185,7 @@ const Page = () => {
       <div className="p-4 border-t border-zinc-800 bg-zinc-900/30">
         <div className="flex gap-2">
           <div className="flex-1 relative group">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-green-500 animate-pulse">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-500 animate-pulse">
               {">"}
             </span>
             <input

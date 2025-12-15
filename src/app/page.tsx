@@ -60,7 +60,7 @@ function Lobby() {
           </div>
         ) : null}
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight text-green-500">
+          <h1 className="text-2xl font-bold tracking-tight text-teal-500">
             {"> "}VYSPR
           </h1>
           <p className="text-zinc-500 text-sm">
