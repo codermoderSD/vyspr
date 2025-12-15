@@ -3,6 +3,7 @@
 import { useUsername } from "@/hooks/useUsername";
 import { client } from "@/lib/client";
 import { useMutation } from "@tanstack/react-query";
+import Spinner from "@/components/Spinner";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
@@ -21,7 +22,7 @@ function Lobby() {
   const destroyed = searchParams.get("destroyed") === "true";
   const error = searchParams.get("error");
 
-  const { mutate: createRoom } = useMutation({
+  const createRoomMutation = useMutation<void, unknown, void, unknown>({
     mutationFn: async () => {
       const res = await client.room.create.post();
 
@@ -30,6 +31,8 @@ function Lobby() {
       }
     },
   });
+  const createRoom = createRoomMutation.mutate;
+  const isCreating = createRoomMutation.status === "pending";
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4">
@@ -80,10 +83,22 @@ function Lobby() {
               </div>
             </div>
             <button
-              className="w-full bg-zinc-100 text-black font-bold p-3 text-sm hover:g-zinc-50 hover:text-black transition-colors mt-2 cursor-pointer disabled:opacity-50"
+              className="w-full bg-zinc-100 text-black font-bold p-3 text-sm hover:g-zinc-50 hover:text-black transition-colors mt-2 cursor-pointer disabled:opacity-50 flex items-center justify-center"
               onClick={() => createRoom()}
+              disabled={isCreating}
             >
-              Create Secure Room
+              {isCreating ? (
+                <>
+                  <Spinner
+                    size={16}
+                    className="text-black mr-2"
+                    aria-label="creating"
+                  />
+                  Creating...
+                </>
+              ) : (
+                "Create Secure Room"
+              )}
             </button>
           </div>
         </div>

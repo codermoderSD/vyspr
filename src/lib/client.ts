@@ -6,5 +6,5 @@ export const client =
   typeof window === "undefined"
     ? treaty(app).api
     : treaty<typeof app>(
-        process.env.NEXT_PUBLIC_API_URL! || "http://localhost:3000/api"
+        process.env.NEXT_PUBLIC_API_URL! || "http://localhost:3000"
       ).api;

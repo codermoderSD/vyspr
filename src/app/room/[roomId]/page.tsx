@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useParams, useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
+import Spinner from "@/components/Spinner";
 
 const Page = () => {
   const params = useParams();
@@ -18,6 +19,8 @@ const Page = () => {
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [inputMessage, setInputMessage] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [pendingMessages, setPendingMessages] = useState<any[]>([]);
 
   const { data: ttlData } = useQuery({
     queryKey: ["room-ttl", roomId],
@@ -66,13 +69,49 @@ const Page = () => {
         { query: { roomId } }
       );
     },
+    onError: (_err, variables) => {
+      // remove pending matching the text on error
+      setPendingMessages((prev) =>
+        prev.filter((p) => p.text !== variables.text)
+      );
+    },
+    onSettled: () => {
+      // ensure we have latest messages
+      refetch();
+    },
   });
 
-  const { mutate: destroyRoom } = useMutation({
+  // When messages from server update, remove matching pending messages and scroll to bottom
+  useEffect(() => {
+    if (!messages?.messages) return;
+
+    setPendingMessages((prev) =>
+      prev.filter(
+        (pm) =>
+          !messages.messages.some(
+            (m: any) => m.text === pm.text && m.sender === pm.sender
+          )
+      )
+    );
+
+    // scroll to bottom when new authoritative messages arrive
+    requestAnimationFrame(() => {
+      if (containerRef.current) {
+        containerRef.current.scrollTo({
+          top: containerRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }
+    });
+  }, [messages]);
+
+  const destroyRoomMutation = useMutation<void, unknown, void, unknown>({
     mutationFn: async () => {
       await client.room.delete(null, { query: { roomId } });
     },
   });
+  const destroyRoomMutate = destroyRoomMutation.mutate;
+  const isDestroying = destroyRoomMutation.status === "pending";
 
   useRealtime({
     channels: [roomId],
@@ -81,6 +120,15 @@ const Page = () => {
       if (event === "chat.message") {
         // refetch messages
         refetch();
+        // also scroll to bottom a moment after receiving the message
+        requestAnimationFrame(() => {
+          if (containerRef.current) {
+            containerRef.current.scrollTo({
+              top: containerRef.current.scrollHeight,
+              behavior: "smooth",
+            });
+          }
+        });
       } else if (event === "chat.destroy") {
         // handle room destruction
         router.push("/?destroyed=true");
@@ -104,9 +152,34 @@ const Page = () => {
     return `${mins}:${secs}`;
   };
 
+  const handleSend = (text: string) => {
+    if (!text.trim()) return;
+
+    const pending = {
+      id: `pending-${Date.now()}-${Math.random()}`,
+      sender: username,
+      text,
+      timestamp: Date.now(),
+      status: "pending",
+    };
+
+    setPendingMessages((p) => [...p, pending]);
+
+    // scroll to show pending message
+    requestAnimationFrame(() => {
+      if (containerRef.current)
+        containerRef.current.scrollTo({
+          top: containerRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+    });
+
+    sendMessage({ text });
+  };
+
   return (
-    <main className="flex flex-col h-screen max-h-screen overflow-hidden">
-      <header className="border-b border-zinc-800 p-4 flex items-center justify-between bg-zinc-900/30">
+    <main className="flex flex-col h-screen max-h-screen overflow-hidden min-h-0">
+      <header className="sticky top-0 z-20 border-b border-zinc-800 p-4 flex items-center justify-between bg-zinc-900/80 backdrop-blur-sm">
         <div className="flex items-center gap-4">
           <div className="flex flex-col">
             <span className="text-xs text-zinc-500 uppercase">Room ID</span>
@@ -139,15 +212,32 @@ const Page = () => {
           </div>
         </div>
         <button
-          onClick={() => destroyRoom()}
-          className="text-xs bg-zinc-800 hover:bg-red-600 px-3 py-1.5 rounded text-zinc-400 hover:text-white font-bold transition-all group flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+          onClick={() => destroyRoomMutate()}
+          disabled={isDestroying}
+          className="text-xs bg-zinc-800 hover:bg-red-600 px-2 sm:px-3 py-1.5 rounded text-zinc-400 hover:text-white font-bold transition-all group flex items-center gap-2 disabled:opacity-50 cursor-pointer"
         >
-          <span className="group-hover:animate-pulse">💣</span>
-          DESTROY NOW
+          {isDestroying ? (
+            <>
+              <Spinner
+                size={14}
+                className="text-white"
+                aria-label="destroying"
+              />
+              <span className="hidden sm:inline">Destroying...</span>
+            </>
+          ) : (
+            <>
+              <span>💣</span>
+              <span className="hidden sm:inline">DESTROY NOW</span>
+            </>
+          )}
         </button>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+      <div
+        ref={containerRef}
+        className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 scrollbar-thin"
+      >
         {messages?.messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-zinc-600 text-sm font-mono">
@@ -155,15 +245,16 @@ const Page = () => {
             </p>
           </div>
         ) : (
+          // render authoritative server messages first
           messages?.messages.map((msg) => (
             <div key={msg.id} className="flex flex-col items-start">
               <div className="max-w-[80%] group">
                 <div className="flex items-baseline gap-3 mb-1">
                   <span
-                    className={`text-xs font-bold ${
+                    className={`text-xs ${
                       msg.sender === username
-                        ? "text-teal-500"
-                        : "text-blue-400"
+                        ? "font-semibold text-teal-500"
+                        : "font-bold text-blue-400"
                     }`}
                   >
                     {msg.sender === username ? "You" : msg.sender}
@@ -180,12 +271,30 @@ const Page = () => {
             </div>
           ))
         )}
-      </div>
 
-      <div className="p-4 border-t border-zinc-800 bg-zinc-900/30">
+        {/* pending optimistic messages (render after server messages) */}
+        {pendingMessages.map((msg) => (
+          <div key={msg.id} className="flex flex-col items-end">
+            <div className="max-w-[80%] group">
+              <div className="flex items-baseline gap-3 mb-1 justify-end">
+                <span className={`text-xs font-bold text-teal-500`}>
+                  {"You"}
+                </span>
+                <span className="text-[10px] text-zinc-600">
+                  {format(new Date(msg.timestamp), "hh:mm a")}
+                </span>
+              </div>
+              <p className="text-sm text-zinc-300 leading-relaxed break-all opacity-60 italic">
+                {msg.text}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="sticky bottom-0 z-20 p-4 border-t border-zinc-800 bg-zinc-900/80 backdrop-blur-sm">
         <div className="flex gap-2">
           <div className="flex-1 relative group">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-500 animate-pulse">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-500">
               {">"}
             </span>
             <input
@@ -196,9 +305,7 @@ const Page = () => {
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && inputMessage.trim()) {
-                  sendMessage({
-                    text: inputMessage.trim(),
-                  });
+                  handleSend(inputMessage.trim());
                   inputRef?.current?.focus();
                   setInputMessage("");
                 } else {
@@ -210,14 +317,25 @@ const Page = () => {
           </div>
           <button
             onClick={() => {
-              sendMessage({ text: inputMessage });
+              handleSend(inputMessage);
               setInputMessage("");
               inputRef?.current?.focus();
             }}
             disabled={!inputMessage.trim() || isPending}
-            className="bg-zinc-200 text-zinc-900 px-6 text-sm font-bold hover:bg-zinc-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer rounded"
+            className="bg-zinc-200 text-zinc-900 px-6 text-sm font-bold hover:bg-zinc-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer rounded flex items-center justify-center"
           >
-            Send
+            {isPending ? (
+              <>
+                <Spinner
+                  size={14}
+                  className="text-zinc-900 mr-2"
+                  aria-label="sending"
+                />
+                Sending...
+              </>
+            ) : (
+              "Send"
+            )}
           </button>
         </div>
       </div>
